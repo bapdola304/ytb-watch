@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Draggable YouTube Player</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .background-pattern {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                radial-gradient(circle at 20% 20%, rgba(255,255,255,0.1) 2px, transparent 2px),
+                radial-gradient(circle at 80% 80%, rgba(255,255,255,0.1) 2px, transparent 2px);
+            background-size: 50px 50px;
+            pointer-events: none;
+        }
+
+        .control-panel {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            min-width: 300px;
+        }
+
+        .control-panel h2 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+
+        .input-group {
+            margin-bottom: 15px;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #555;
+            font-weight: 500;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s ease;
+        }
+
+        .input-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: transform 0.2s ease;
+            width: 100%;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .youtube-container {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 560px;
+            height: 315px;
+            background: #000;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+            cursor: move;
+            user-select: none;
+            transition: box-shadow 0.3s ease;
+        }
+
+        .youtube-container:hover {
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.4);
+        }
+
+        .youtube-container.dragging {
+            z-index: 999;
+            transform: translate(-50%, -50%) rotate(2deg);
+        }
+
+        .video-header {
+            background: linear-gradient(45deg, #ff4757, #ff6b81);
+            color: white;
+            padding: 10px 15px;
+            font-size: 14px;
+            font-weight: 500;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: move;
+        }
+
+        .video-controls {
+            display: flex;
+            gap: 10px;
+        }
+
+        .control-btn {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            border: none;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+
+        .control-btn:hover {
+            transform: scale(1.1);
+        }
+
+        .minimize-btn {
+            background: #ffa502;
+        }
+
+        .maximize-btn {
+            background: #2ed573;
+        }
+
+        .close-btn {
+            background: #ff4757;
+        }
+
+        .video-frame {
+            width: 100%;
+            height: calc(100% - 40px);
+            border: none;
+        }
+
+        .resize-handle {
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            width: 20px;
+            height: 20px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            cursor: se-resize;
+            border-radius: 12px 0 12px 0;
+        }
+
+        .resize-handle::before {
+            content: '';
+            position: absolute;
+            bottom: 3px;
+            right: 3px;
+            width: 3px;
+            height: 3px;
+            background: white;
+            border-radius: 50%;
+        }
+
+        .resize-handle::after {
+            content: '';
+            position: absolute;
+            bottom: 8px;
+            right: 8px;
+            width: 3px;
+            height: 3px;
+            background: white;
+            border-radius: 50%;
+        }
+
+        .instructions {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            max-width: 250px;
+            font-size: 12px;
+            color: #666;
+            display: none;
+        }
+
+        .minimized {
+            width: 200px !important;
+            height: 150px !important;
+        }
+
+        @media (max-width: 768px) {
+            .control-panel {
+                position: relative;
+                top: 0;
+                left: 0;
+                margin: 10px;
+                min-width: auto;
+            }
+
+            .youtube-container {
+                width: 90vw;
+                height: 50vw;
+                max-width: 560px;
+                max-height: 315px;
+            }
+
+            .instructions {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="background-pattern"></div>
+    
+    <div class="control-panel">
+        <h2>🎥 YouTube Player</h2>
+        <div class="input-group">
+            <label>Video ID hoặc URL:</label>
+            <input type="text" id="videoInput" placeholder="Nhập video ID hoặc URL YouTube" value="dQw4w9WgXcQ">
+        </div>
+        <button class="btn" onclick="loadVideo()">Tải Video</button>
+    </div>
+
+    <div class="youtube-container" id="youtubeContainer">
+        <div class="video-header">
+            <span>YouTube Player</span>
+            <div class="video-controls">
+                <button class="control-btn minimize-btn" onclick="toggleMinimize()" title="Thu nhỏ"></button>
+                <button class="control-btn maximize-btn" onclick="resetSize()" title="Kích thước gốc"></button>
+                <button class="control-btn close-btn" onclick="hideVideo()" title="Ẩn"></button>
+            </div>
+        </div>
+        <iframe 
+            id="videoFrame"
+            src="https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=0&rel=0&showinfo=0&controls=1"
+            title="YouTube video player"
+            frameborder="0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowfullscreen
+            class="video-frame">
+        </iframe>
+        <div class="resize-handle" id="resizeHandle"></div>
+    </div>
+
+    <div class="instructions">
+        <strong>Hướng dẫn:</strong><br>
+        • Kéo vùng header để di chuyển<br>
+        • Kéo góc dưới phải để thay đổi kích thước<br>
+        • Sử dụng các nút điều khiển trên header
+    </div>
+
+    <script>
+        let isDragging = false;
+        let isResizing = false;
+        let startX, startY, startLeft, startTop, startWidth, startHeight;
+
+        const container = document.getElementById('youtubeContainer');
+        const header = container.querySelector('.video-header');
+        const resizeHandle = document.getElementById('resizeHandle');
+
+        // Dragging functionality
+        header.addEventListener('mousedown', startDrag);
+        document.addEventListener('mousemove', drag);
+        document.addEventListener('mouseup', stopDrag);
+
+        // Resizing functionality
+        resizeHandle.addEventListener('mousedown', startResize);
+        document.addEventListener('mousemove', resize);
+        document.addEventListener('mouseup', stopResize);
+
+        function startDrag(e) {
+            if (e.target.classList.contains('control-btn')) return;
+            isDragging = true;
+            container.classList.add('dragging');
+            
+            const rect = container.getBoundingClientRect();
+            startX = e.clientX - rect.left;
+            startY = e.clientY - rect.top;
+        }
+
+        function drag(e) {
+            if (!isDragging) return;
+            e.preventDefault();
+            
+            const newLeft = e.clientX - startX;
+            const newTop = e.clientY - startY;
+            
+            container.style.left = newLeft + 'px';
+            container.style.top = newTop + 'px';
+            container.style.transform = 'none';
+        }
+
+        function stopDrag() {
+            isDragging = false;
+            container.classList.remove('dragging');
+        }
+
+        function startResize(e) {
+            isResizing = true;
+            e.stopPropagation();
+            
+            const rect = container.getBoundingClientRect();
+            startWidth = rect.width;
+            startHeight = rect.height;
+            startX = e.clientX;
+            startY = e.clientY;
+        }
+
+        function resize(e) {
+            if (!isResizing) return;
+            e.preventDefault();
+            
+            const newWidth = Math.max(200, startWidth + (e.clientX - startX));
+            const newHeight = Math.max(150, startHeight + (e.clientY - startY));
+            
+            container.style.width = newWidth + 'px';
+            container.style.height = newHeight + 'px';
+        }
+
+        function stopResize() {
+            isResizing = false;
+        }
+
+        function loadVideo() {
+            const input = document.getElementById('videoInput').value;
+            const videoFrame = document.getElementById('videoFrame');
+            
+            let videoId = '';
+            
+            // Extract video ID from different YouTube URL formats
+            if (input.includes('youtube.com/watch?v=')) {
+                videoId = input.split('v=')[1].split('&')[0];
+            } else if (input.includes('youtu.be/')) {
+                videoId = input.split('youtu.be/')[1].split('?')[0];
+            } else if (input.includes('youtube.com/embed/')) {
+                videoId = input.split('embed/')[1].split('?')[0];
+            } else {
+                // Assume it's already a video ID
+                videoId = input;
+            }
+            
+            if (videoId) {
+                videoFrame.src = `https://www.youtube.com/embed/${videoId}?autoplay=0&rel=0&showinfo=0&controls=1`;
+                container.style.display = 'block';
+            } else {
+                alert('Vui lòng nhập URL hoặc Video ID hợp lệ!');
+            }
+        }
+
+        function toggleMinimize() {
+            container.classList.toggle('minimized');
+        }
+
+        function resetSize() {
+            container.style.width = '560px';
+            container.style.height = '315px';
+            container.classList.remove('minimized');
+        }
+
+        function hideVideo() {
+            container.style.display = 'none';
+        }
+
+        // Touch support for mobile
+        header.addEventListener('touchstart', handleTouchStart, {passive: false});
+        document.addEventListener('touchmove', handleTouchMove, {passive: false});
+        document.addEventListener('touchend', handleTouchEnd);
+
+        let touchStartX, touchStartY;
+
+        function handleTouchStart(e) {
+            if (e.target.classList.contains('control-btn')) return;
+            e.preventDefault();
+            isDragging = true;
+            container.classList.add('dragging');
+            
+            const touch = e.touches[0];
+            const rect = container.getBoundingClientRect();
+            startX = touch.clientX - rect.left;
+            startY = touch.clientY - rect.top;
+        }
+
+        function handleTouchMove(e) {
+            if (!isDragging) return;
+            e.preventDefault();
+            
+            const touch = e.touches[0];
+            const newLeft = touch.clientX - startX;
+            const newTop = touch.clientY - startY;
+            
+            container.style.left = newLeft + 'px';
+            container.style.top = newTop + 'px';
+            container.style.transform = 'none';
+        }
+
+        function handleTouchEnd() {
+            isDragging = false;
+            container.classList.remove('dragging');
+        }
+
+        // Prevent default drag behavior on images
+        document.addEventListener('dragstart', function(e) {
+            e.preventDefault();
+        });
+    </script>
+</body>
+</html>
